@@ -1,6 +1,5 @@
-from platform import node
 import numpy as np
-# from make_data import X, y
+
 
 class Node:
     def __init__(self, feature_index=None, threshold=None, left=None, right=None, value=None):
@@ -12,10 +11,13 @@ class Node:
 
 
 class DecisionTree:
-    def __init__(self, min_samples_split=2, max_depth=100):
+    def __init__(self, min_samples_split=2, max_depth=100, features=None, result_name = None, result_vals = None):
         self.min_samples_split = min_samples_split
         self.max_depth = max_depth
         self.root = None
+        self.features = features
+        self.result_name = result_name
+        self.result_vals = result_vals
 
     def _entropy(self, y):
         counts = np.bincount(y)
@@ -41,7 +43,7 @@ class DecisionTree:
         return ig
 
     def _best_split(self, X, y):
-        best_split = {'gain': -1, 'feature': None, 'threshold': None}
+        best_split = {'gain': 0.0, 'feature': None, 'threshold': None}
         n_samples, n_features = X.shape
         for feat_idx in range(n_features):
             X_column = X[:, feat_idx]
@@ -57,6 +59,8 @@ class DecisionTree:
     def _build_tree(self, X, y, depth=0):
         n_samples, n_features = X.shape
         n_labels = len(np.unique(y))
+        if n_samples == 0:
+            return Node(value=0)
         if depth >= self.max_depth or n_labels == 1 or n_samples < self.min_samples_split:
             leaf_value = np.bincount(y).argmax()
             return Node(value=leaf_value)
@@ -83,24 +87,28 @@ class DecisionTree:
     def predict(self, X):
         return np.array([self._traverse_tree(x, self.root) for x in X])
     
-    def print_tree(self, node=None, depth=0):
+    def print_tree(self, node=None, prefix='', is_left=True, is_root=True):
         if node is None:
             node = self.root
             if node is None:
                 print("The tree has not been trained yet!")
+                return
+        if is_root:
+            connector=''
+            branch_label=''
+        else:
+            connector = "├── " if is_left else "└── "
+            branch_label = 'True: ' if is_left else 'False: '
         if node.value is not None:
-            print('  ' * depth + f'Predict: Class {node.value}')
+            result_name = self.result_name if self.result_name is not None else 'Class'
+            node_val = self.result_vals[node.value] if self.result_vals is not None else node.value
+            print(prefix + connector + branch_label + f'Predict: {result_name} = {node_val}')
             return
-        print('  ' * depth + f'[Feature {node.feature_index} <= {node.threshold:.4f}]')
-        print('  ' * (depth + 1) + '--> True:')
-        self.print_tree(node.left, depth + 2)
-        print('  ' * (depth + 1) + '--> False:')
-        self.print_tree(node.right, depth + 2)
-
-
-# if __name__ == '__main__':
-#     tree = DecisionTree()
-#     initial_chaos = tree._entropy(y)
-#     print(f'number of samples = {len(y)}')
-#     print(f'distribution = {np.bincount(y)}')
-#     print(f'initial entropy = {initial_chaos:.4f}')
+        feat_name = self.features[node.feature_index] if self.features else f'Feature {node.feature_index}'
+        print(prefix + connector + branch_label + f'[{feat_name} <= {node.threshold:.4f}]')
+        if is_root:
+            new_prefix = ''
+        else:
+            new_prefix = prefix + ("│   " if is_left else "    ")
+        self.print_tree(node.left, new_prefix, is_left=True, is_root=False)
+        self.print_tree(node.right, new_prefix, is_left=False, is_root=False)
