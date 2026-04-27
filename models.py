@@ -1,5 +1,5 @@
 import numpy as np
-
+from collections import Counter
 
 class Node:
     def __init__(self, feature_index=None, threshold=None, left=None, right=None, value=None):
@@ -11,8 +11,9 @@ class Node:
 
 
 class DecisionTree:
-    def __init__(self, min_samples_split=2, max_depth=100, features=None, result_name = None, result_vals = None):
+    def __init__(self, min_samples_split=2, max_features=None, max_depth=100, features=None, result_name = None, result_vals = None):
         self.min_samples_split = min_samples_split
+        self.max_features = max_features
         self.max_depth = max_depth
         self.root = None
         self.features = features
@@ -45,7 +46,11 @@ class DecisionTree:
     def _best_split(self, X, y):
         best_split = {'gain': 0.0, 'feature': None, 'threshold': None}
         n_samples, n_features = X.shape
-        for feat_idx in range(n_features):
+        if self.max_features is not None:
+            feature_indices = np.random.choice(n_features, self.max_features, replace=False)
+        else:
+            feature_indices = range(n_features)
+        for feat_idx in feature_indices:
             X_column = X[:, feat_idx]
             thresholds = np.unique(X_column)
             for threshold in thresholds:
@@ -112,3 +117,37 @@ class DecisionTree:
             new_prefix = prefix + ("│   " if is_left else "    ")
         self.print_tree(node.left, new_prefix, is_left=True, is_root=False)
         self.print_tree(node.right, new_prefix, is_left=False, is_root=False)
+
+
+class RandomForest:
+    def __init__(self, n_trees=10, max_depth=3, min_samples_split=2, max_features=4, features=None, result_name=None, result_vals=None):
+        self.n_trees = n_trees
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.max_features = max_features
+        self.features = features
+        self.result_name = result_name
+        self.result_vals = result_vals
+        self.trees = []
+
+    def _bootstrap_samples(self, X, y):
+        n_samples = X.shape[0]
+        idxs = np.random.choice(n_samples, n_samples, replace=True)
+        return X[idxs], y[idxs]
+    
+    def fit(self, X, y):
+        self.trees = []
+        for _ in range(self.n_trees):
+            X_sample, y_sample = self._bootstrap_samples(X, y)
+            tree = DecisionTree(max_depth=self.max_depth, min_samples_split=self.min_samples_split, max_features=self.max_features, features=self.features, result_name=self.result_name, result_vals=self.result_vals)
+            tree.fit(X_sample, y_sample)
+            self.trees.append(tree)
+    
+    def _majority_vote(self, predictions):
+        counter = Counter(predictions)
+        return counter.most_common(1)[0][0]
+    
+    def predict(self, X):
+        tree_preds = np.array([tree.predict(X) for tree in self.trees])
+        tree_preds = np.swapaxes(tree_preds, 0, 1)
+        return np.array([self._majority_vote(preds) for preds in tree_preds])

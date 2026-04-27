@@ -10,6 +10,7 @@ def get_data():
     df['GroupSize'] = df.groupby('Group')['Group'].transform('count')
     df[['CabinDeck', 'CabinNum', 'CabinSize']] = df['Cabin'].str.split('/', expand=True)
     df[['FirstName', 'LastName']] = df['Name'].str.split(' ', n=1, expand=True)
+    df['IsSolo'] = (df['GroupSize'] == 1).astype(int)
     bills = ['RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck']
     df.loc[(df[bills].sum(axis=1)>0) & (df['CryoSleep'].isna()), 'CryoSleep'] = False
     df['CryoSleep'] = df['CryoSleep'].fillna(df['CryoSleep'].mode()[0])
@@ -17,6 +18,8 @@ def get_data():
         df.loc[(df['CryoSleep'] == True) & (df[col].isna()), col] = 0
     for col in ['Age'] + bills:
         df[col] = df[col].fillna(df[col].median())
+    df['TotalSpend'] = df[bills].sum(axis=1)
+    df['IsInfant'] = (df['Age'] <= 5).astype(int)
     categories = ['HomePlanet', 'Destination', 'VIP', 'CabinDeck', 'CabinSize']
     for col in categories:
         df[col] = df[col].fillna(df[col].mode()[0])
